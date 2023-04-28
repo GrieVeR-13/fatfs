@@ -5,6 +5,8 @@
 #ifndef _DISKIO_DEFINED
 #define _DISKIO_DEFINED
 
+#include <jni.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -25,12 +27,11 @@ typedef enum {
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
 
-
-DSTATUS disk_initialize (BYTE pdrv);
-DSTATUS disk_status (BYTE pdrv);
-DRESULT disk_read (BYTE pdrv, BYTE* buff, LBA_t sector, UINT count);
-DRESULT disk_write (BYTE pdrv, const BYTE* buff, LBA_t sector, UINT count);
-DRESULT disk_ioctl (BYTE pdrv, BYTE cmd, void* buff);
+DSTATUS disk_initialize (jobject raio);
+DSTATUS disk_status (jobject raio);
+DRESULT disk_read (jobject raio, BYTE* buff, LBA_t sector, UINT count);
+DRESULT disk_write (jobject raio, const BYTE* buff, LBA_t sector, UINT count);
+DRESULT disk_ioctl (jobject raio, BYTE cmd, void* buff);
 
 
 /* Disk Status Bits (DSTATUS) */
