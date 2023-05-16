@@ -918,7 +918,7 @@ static int lock_volume (	/* 1:Ok, 0:timeout */
 		}
 	}
 #else
-	rv = syslock ? ff_mutex_take(fs->ldrv) : ff_mutex_take(fs->ldrv);	/* Lock the volume (this is to prevent compiler warning) */
+	rv = syslock ? ff_mutex_take(fs) : ff_mutex_take(fs);	/* Lock the volume (this is to prevent compiler warning) */
 #endif
 	return rv;
 }
@@ -936,7 +936,7 @@ static void unlock_volume (
 			ff_mutex_give(FF_VOLUMES);
 		}
 #endif
-		ff_mutex_give(fs->ldrv);	/* Unlock the volume */
+		ff_mutex_give(fs);	/* Unlock the volume */
 	}
 }
 
@@ -3689,7 +3689,7 @@ FRESULT f_mount (
 		clear_share(cfs);
 #endif
 #if FF_FS_REENTRANT				/* Discard mutex of the current volume */
-		ff_mutex_delete(vol);
+		ff_mutex_delete(cfs);
 #endif
 		cfs->fs_type = 0;		/* Invalidate the filesystem object to be unregistered */
 	}
@@ -3697,8 +3697,8 @@ FRESULT f_mount (
 	if (fs) {					/* Register new filesystem object */
 //		fs->raio = LD2PD(vol);	/* Volume hosting physical drive */
 #if FF_FS_REENTRANT				/* Create a volume mutex */
-		fs->ldrv = (BYTE)vol;	/* Owner volume ID */
-		if (!ff_mutex_create(vol)) return FR_INT_ERR;
+//		fs->ldrv = (BYTE)vol;	/* Owner volume ID */
+		if (!ff_mutex_create(fs)) return FR_INT_ERR;
 #if FF_FS_LOCK
 		if (SysLock == 0) {		/* Create a system mutex if needed */
 			if (!ff_mutex_create(FF_VOLUMES)) {
