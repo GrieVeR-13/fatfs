@@ -32,6 +32,7 @@ DSTATUS disk_status (jobject raio);
 DRESULT disk_read (jobject raio, BYTE* buff, LBA_t sector, UINT count);
 DRESULT disk_write (jobject raio, const BYTE* buff, LBA_t sector, UINT count);
 DRESULT disk_ioctl (jobject raio, BYTE cmd, void* buff);
+DRESULT disk_size (jobject raio, FSIZE_t *size);
 
 
 /* Disk Status Bits (DSTATUS) */

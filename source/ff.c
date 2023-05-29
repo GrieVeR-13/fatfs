@@ -4919,8 +4919,132 @@ FRESULT f_getfree (
 	LEAVE_FF(fs, res);
 }
 
+FRESULT f_getFreeSpaceFromEnd(
+	FATFS *fuseFatFs,
+	const TCHAR* path,	/* Logical drive number */
+	FSIZE_t* freeSpaceFromEnd
+)
+{
+	FRESULT res;
+	FATFS *fs;
+	DWORD nfree, clst, stat;
+	LBA_t sect;
+	UINT i;
+	FFOBJID obj;
 
 
+	/* Get logical drive */
+	res = mount_volume(fuseFatFs, &path, &fs, 0);
+	if (res == FR_OK) {
+		/* If free_clst is valid, return it without full FAT scan */
+//		if (fs->free_clst <= fs->n_fatent - 2) {
+//			*nclst = fs->free_clst;
+//		} else {
+			/* Scan FAT to obtain number of free clusters */
+			DWORD currentFirstFreeCluster = -1;
+			nfree = 0;
+			if (fs->fs_type == FS_FAT12) {	/* FAT12: Scan bit field FAT entries */
+				clst = 2; obj.fs = fs;
+				do {
+					stat = get_fat(&obj, clst);
+					if (stat == 0xFFFFFFFF) {
+						res = FR_DISK_ERR; break;
+					} else if (stat == 1) {
+						res = FR_INT_ERR; break;
+					} else if (stat == 0) {
+                        if (currentFirstFreeCluster == -1) {
+							currentFirstFreeCluster = clst;
+                        }
+                        nfree++;
+                    } else {
+						currentFirstFreeCluster = -1;
+                    }
+				} while (++clst < fs->n_fatent);
+			} else {
+#if FF_FS_EXFAT
+				if (fs->fs_type == FS_EXFAT) {	/* exFAT: Scan allocation bitmap */
+					BYTE bm;
+					UINT b;
+
+					clst = fs->n_fatent - 2;	/* Number of clusters */
+					sect = fs->bitbase;			/* Bitmap sector */
+					i = 0;						/* Offset in the sector */
+					do {	/* Counts numbuer of bits with zero in the bitmap */
+						if (i == 0) {	/* New sector? */
+							res = move_window(fs, sect++);
+							if (res != FR_OK) break;
+						}
+						for (b = 8, bm = ~fs->win[i]; b && clst; b--, clst--) {
+							nfree += bm & 1;
+							bm >>= 1;
+						}
+						i = (i + 1) % SS(fs);
+					} while (clst);
+				} else
+#endif
+				{	/* FAT16/32: Scan WORD/DWORD FAT entries */
+					clst = fs->n_fatent;	/* Number of entries */
+					sect = fs->fatbase;		/* Top of the FAT */
+					i = 0;					/* Offset in the sector */
+					do {	/* Counts numbuer of entries with zero in the FAT */
+						if (i == 0) {	/* New sector? */
+							res = move_window(fs, sect++);
+							if (res != FR_OK) break;
+						}
+						if (fs->fs_type == FS_FAT16) {
+							if (ld_word(fs->win + i) == 0) {
+								if (currentFirstFreeCluster == -1) {
+									currentFirstFreeCluster = fs->n_fatent - clst;
+								}
+								nfree++;
+							} else {
+								currentFirstFreeCluster = -1;
+							}
+							i += 2;
+						} else {
+							if ((ld_dword(fs->win + i) & 0x0FFFFFFF) == 0) {
+								if (currentFirstFreeCluster == -1) {
+									currentFirstFreeCluster = fs->n_fatent - clst;
+								}
+								nfree++;
+							} else {
+								currentFirstFreeCluster = -1;
+							}
+							i += 4;
+						}
+						i %= SS(fs);
+					} while (--clst);
+				}
+			}
+			if (res == FR_OK) {		/* Update parameters if succeeded */
+				if (currentFirstFreeCluster == -1) {
+					*freeSpaceFromEnd = 0;
+				}
+				else {
+					LBA_t sector = clst2sect(fuseFatFs, currentFirstFreeCluster);
+					FSIZE_t freePosition = (FSIZE_t)sector * FF_SECTOR_SIZE;
+					FSIZE_t size;
+					DRESULT dr = disk_size(fs->raio, &size);
+					if (dr != RES_OK) {
+						res = FR_DISK_ERR;
+					}
+					else {
+						if (freePosition >= size) {
+							res = FR_DISK_ERR;
+						}
+						else {
+							*freeSpaceFromEnd = size - freePosition;
+						}
+					}
+				}
+				fs->free_clst = nfree;	/* Now free_clst is valid */
+				fs->fsi_flag |= 1;		/* FAT32: FSInfo is to be updated */
+			}
+//		}
+	}
+
+	LEAVE_FF(fs, res);
+}
 
 /*-----------------------------------------------------------------------*/
 /* Truncate File                                                         */

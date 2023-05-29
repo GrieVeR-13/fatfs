@@ -126,3 +126,15 @@ DRESULT disk_ioctl(
     abort();
 }
 
+DRESULT disk_size(jobject raio, FSIZE_t *size)
+{
+    JNIEnv *env = c_get_env();
+    off64_t raio_size = raio_get_size(env, raio);
+    if (size < 0) {
+        return RES_ERROR;
+    }
+    *size = (FSIZE_t)raio_size;
+    return RES_OK;
+}
+
+
